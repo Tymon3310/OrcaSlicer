@@ -89,13 +89,20 @@ jobs:
           ./build_linux.sh -istrlL
           ./scripts/check_appimage_libs.sh ./build/package ./build/package/bin/orca-slicer
 
-          appimage="$(find build -maxdepth 1 -type f -name '*.AppImage' | head -n 1 || true)"
-          if [[ -z "$appimage" ]]; then
+          mapfile -t appimages < <(find build -maxdepth 3 -type f -name '*.AppImage' ! -name 'appimagetool.AppImage' | LC_ALL=C sort)
+
+          if (( ${#appimages[@]} == 0 )); then
             echo "ERROR: AppImage not produced"
-            find build -maxdepth 3 -type f | sort
+            find build -maxdepth 3 -type f | LC_ALL=C sort
             exit 1
           fi
 
+          if (( ${#appimages[@]} > 1 )); then
+            echo "INFO: multiple AppImage candidates found, using the first sorted entry"
+            printf '%s\n' "${appimages[@]}"
+          fi
+
+          appimage="${appimages[0]}"
           mv "$appimage" "out/OrcaSlicer-BMCU_Linux_AppImage_${DIST_ID}_amd64_${VER}.AppImage"
           chmod +x "out/OrcaSlicer-BMCU_Linux_AppImage_${DIST_ID}_amd64_${VER}.AppImage"
 
