@@ -2207,10 +2207,18 @@ std::pair<PresetsConfigSubstitutions, std::string> PresetBundle::load_system_pre
             other_vendors.push_back(vn);
     }
 
-    // Step 1: Load ORCA_FILAMENT_LIBRARY into `this` synchronously.
     if (!orca_lib_vendor.empty()) {
         try {
-            append(substitutions, this->load_vendor_configs_from_json(dir.string(), orca_lib_vendor, PresetBundle::LoadSystem, compatibility_rule).first);
+            boost::filesystem::path vendor_root_dir = dir;
+            if (!validation_mode) {
+                const boost::filesystem::path resources_profiles_dir = (boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
+                if (boost::filesystem::exists(resources_profiles_dir / (orca_lib_vendor + ".json")) &&
+                    boost::filesystem::exists(resources_profiles_dir / orca_lib_vendor)) {
+                    vendor_root_dir = resources_profiles_dir;
+                    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": load OrcaFilamentLibrary from resources: " << vendor_root_dir.string();
+                }
+            }
+            append(substitutions, this->load_vendor_configs_from_json(vendor_root_dir.string(), orca_lib_vendor, PresetBundle::LoadSystem, compatibility_rule).first);
             first = false;
         } catch (const std::runtime_error &err) {
             if (validation_mode)

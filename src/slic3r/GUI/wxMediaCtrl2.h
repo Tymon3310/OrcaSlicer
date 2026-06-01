@@ -16,6 +16,7 @@ wxDECLARE_EVENT(EVT_MEDIA_CTRL_STAT, wxCommandEvent);
 #if defined(__LINUX__) && defined(__WXGTK__)
 typedef struct _GstElement GstElement;
 #endif
+void wxMediaCtrl_OnSize(wxWindow * ctrl, wxSize const & videoSize, int width, int height);
 
 #ifdef __WXMAC__
 
@@ -23,7 +24,7 @@ class wxMediaCtrl2 : public wxWindow
 {
 public:
     wxMediaCtrl2(wxWindow * parent);
-    
+
     ~wxMediaCtrl2();
 
     void Load(wxURI url);
@@ -40,13 +41,13 @@ public:
 
     int GetLastError() const { return m_error; }
 
-    static inline const wxMediaState MEDIASTATE_BUFFERING = static_cast<wxMediaState>(6);
+    static constexpr wxMediaState MEDIASTATE_BUFFERING = (wxMediaState) 6;
 
 protected:
     void DoSetSize(int x, int y, int width, int height, int sizeFlags) override;
 
-    static void bambu_log(void const * ctx, int level, char const * msg);
-    
+    static void bambu_log(void const *ctx, int level, char const *msg);
+
     void NotifyStopped();
 
 private:

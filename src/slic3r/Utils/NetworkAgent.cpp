@@ -32,7 +32,7 @@ int invoke_on_all_cloud_agents(const std::map<std::string, std::shared_ptr<IClou
 
 } // namespace
 
-bool NetworkAgent::use_legacy_network = true;
+bool NetworkAgent::use_legacy_network = false;
 
 // ============================================================================
 // Static methods - delegate to BBLNetworkPlugin
@@ -917,6 +917,22 @@ int NetworkAgent::start_sdcard_print(PrintParams params, OnUpdateStatusFn update
     return -1;
 }
 
+bool NetworkAgent::retry_last_print_request(const std::string& dev_id)
+{
+    std::shared_ptr<IPrinterAgent> printer_agent;
+    {
+        std::lock_guard<std::mutex> lock(m_agent_mutex);
+        printer_agent = m_printer_agent;
+    }
+
+    auto bbl_printer_agent = std::dynamic_pointer_cast<BBLPrinterAgent>(printer_agent);
+    if (!bbl_printer_agent) {
+        return false;
+    }
+
+    return bbl_printer_agent->retry_last_print_request(dev_id);
+}
+
 FilamentSyncMode NetworkAgent::get_filament_sync_mode() const
 {
     if (m_printer_agent)
@@ -937,6 +953,88 @@ int NetworkAgent::request_bind_ticket(std::string* ticket)
     if (m_printer_agent)
         return m_printer_agent->request_bind_ticket(ticket);
     return -1;
+}
+
+int NetworkAgent::get_subtask_info(std::string subtask_id, std::string* task_json, unsigned int* http_code, std::string* http_body, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_subtask_info(subtask_id, task_json, http_code, http_body);
+    return -1;
+}
+
+int NetworkAgent::get_slice_info(std::string project_id, std::string profile_id, int plate_index, std::string* slice_json, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_slice_info(project_id, profile_id, plate_index, slice_json);
+    return -1;
+}
+
+int NetworkAgent::query_bind_status(std::vector<std::string> query_list, unsigned int* http_code, std::string* http_body, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->query_bind_status(query_list, http_code, http_body);
+    return -1;
+}
+
+int NetworkAgent::modify_printer_name(std::string dev_id, std::string dev_name, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->modify_printer_name(dev_id, dev_name);
+    return -1;
+}
+
+int NetworkAgent::get_camera_url(std::string dev_id, std::function<void(std::string)> callback, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_camera_url(dev_id, callback);
+    return -1;
+}
+
+int NetworkAgent::get_design_staffpick(int offset, int limit, std::function<void(std::string)> callback, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_design_staffpick(offset, limit, callback);
+    return -1;
+}
+
+int NetworkAgent::start_publish(PublishParams params, OnUpdateStatusFn update_fn, WasCancelledFn cancel_fn, std::string* out, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->start_publish(params, update_fn, cancel_fn, out);
+    return -1;
+}
+
+int NetworkAgent::get_model_publish_url(std::string* url, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_model_publish_url(url);
+    return -1;
+}
+
+int NetworkAgent::get_subtask(BBLModelTask* task, OnGetSubTaskFn getsub_fn, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_subtask(task, getsub_fn);
+    return -1;
+}
+
+int NetworkAgent::get_model_mall_home_url(std::string* url, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_model_mall_home_url(url);
+    return -1;
+}
+
+int NetworkAgent::get_model_mall_detail_url(std::string* url, std::string id, const std::string& provider)
+{
+    const auto cloud_agent = get_cloud_agent(provider);
+    if (cloud_agent) return cloud_agent->get_model_mall_detail_url(url, id);
+    return -1;
+}
+
+void* NetworkAgent::get_network_agent()
+{
+    return BBLNetworkPlugin::instance().get_agent();
 }
 
 } // namespace Slic3r

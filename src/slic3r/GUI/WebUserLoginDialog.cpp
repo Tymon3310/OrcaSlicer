@@ -7,6 +7,8 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/Utils/NetworkAgent.hpp"
 #include "libslic3r_version.h"
+#include "slic3r/Utils/PJarczakLinuxBridge/PJarczakLinuxBridgeConfig.hpp"
+#include "slic3r/Utils/Http.hpp"
 
 #include <wx/sizer.h>
 #include <wx/toolbar.h>
@@ -16,6 +18,11 @@
 #include <wx/fileconf.h>
 #include <wx/file.h>
 #include <wx/wfstream.h>
+
+#ifdef WIN32
+#include <windows.h>
+#include <shellapi.h>
+#endif
 
 #include <boost/cast.hpp>
 #include <boost/asio.hpp>
@@ -34,6 +41,44 @@ using namespace std;
 using namespace nlohmann;
 
 namespace Slic3r { namespace GUI {
+
+namespace {
+#ifdef WIN32
+static bool pjarczak_open_external_browser(const wxString& url)
+{
+    HINSTANCE rc = ::ShellExecuteW(nullptr, L"open", url.wc_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    if ((INT_PTR)rc > 32)
+        return true;
+
+    if (wxLaunchDefaultBrowser(url, wxBROWSER_NEW_WINDOW))
+        return true;
+
+    const wxString cmd = wxString::Format("explorer.exe \"%s\"", url);
+    const long code = wxExecute(cmd, wxEXEC_ASYNC | wxEXEC_HIDE_CONSOLE);
+    return code != 0;
+}
+#else
+static bool pjarczak_open_external_browser(const wxString& url)
+{
+    return wxLaunchDefaultBrowser(url, wxBROWSER_NEW_WINDOW);
+}
+#endif
+
+std::string pjarczak_browser_login_url(const std::string& host_value, const std::string& locale, const std::string& localhost_base)
+{
+    std::string host = host_value;
+    while (!host.empty() && host.back() == '/')
+        host.pop_back();
+    if (host.rfind("http://", 0) != 0 && host.rfind("https://", 0) != 0)
+        host = "https://bambulab.com";
+    std::string lang = locale.empty() ? "en" : locale;
+    std::string callback = host + "/sign-in/callback?source=portal&locale=" + Http::url_encode(lang) +
+                           "&redirect_url=" + Http::url_encode(localhost_base) +
+                           "&openBy=suite&from=studio&slicerLoginType=ticket";
+    return host + "/sign-in?&from=studio&source=portal&to=" + Http::url_encode(callback);
+}
+}
+
 
 #define NETWORK_OFFLINE_TIMER_ID 10001
 
@@ -89,7 +134,6 @@ ZUserLogin::ZUserLogin(std::shared_ptr<ICloudServiceAgent> cloud_agent)
     : wxDialog((wxWindow*) (wxGetApp().mainframe), wxID_ANY, "OrcaSlicer"), m_cloud_agent(cloud_agent)
 {
     SetBackgroundColour(*wxWHITE);
-
     if (!m_cloud_agent) {
         wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
         auto m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1));
@@ -143,6 +187,20 @@ ZUserLogin::ZUserLogin(std::shared_ptr<ICloudServiceAgent> cloud_agent)
         Fit();
         CentreOnParent();
     } else {
+#if defined(WIN32) || defined(__APPLE__) || defined(__WXMAC__)
+        if (Slic3r::PJarczakLinuxBridge::enabled()) {
+            m_external_browser_mode = true;
+            SetTitle(_L("Login"));
+            wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
+            auto* m_message = new wxStaticText(this, wxID_ANY, _L("Login opens in your default browser. Finish sign-in there and this dialog will close automatically."), wxDefaultPosition, wxDefaultSize, 0);
+            m_message->Wrap(FromDIP(420));
+            m_sizer_main->Add(m_message, 0, wxALL | wxEXPAND, FromDIP(16));
+            SetSizer(m_sizer_main);
+            m_sizer_main->SetSizeHints(this);
+            SetSize(FromDIP(wxSize(460, 140)));
+            CentreOnParent();
+        } else {
+#endif
         // Get the login URL from the injected cloud service agent
         wxString strlang = wxGetApp().current_language_code_safe();
         strlang.Replace("_", "-");
@@ -178,6 +236,9 @@ ZUserLogin::ZUserLogin(std::shared_ptr<ICloudServiceAgent> cloud_agent)
         SetSize(pSize);
 
         CentreOnParent();
+#if defined(WIN32) || defined(__APPLE__) || defined(__WXMAC__)
+        }
+#endif
     }
     wxGetApp().UpdateDlgDarkUI(this);
 }
@@ -201,7 +262,29 @@ void ZUserLogin::OnTimer(wxTimerEvent &event) {
 
 bool ZUserLogin::run() {
     m_timer = new wxTimer(this, NETWORK_OFFLINE_TIMER_ID);
-    m_timer->Start(8000);
+    m_timer->Start(m_external_browser_mode ? 30000 : 8000);
+
+#if defined(WIN32) || defined(__APPLE__) || defined(__WXMAC__)
+    if (m_external_browser_mode) {
+        NetworkAgent* agent = wxGetApp().getAgent();
+        if (agent) {
+            wxString strlang = wxGetApp().current_language_code_safe();
+            strlang.Replace("_", "-");
+            const std::string host = agent->get_cloud_service_host();
+            m_loopback_port = LOCALHOST_PORT;
+            wxGetApp().start_http_server(m_loopback_port);
+            const std::string localhost = std::string(LOCALHOST_URL) + std::to_string(m_loopback_port);
+            const std::string browser_url = pjarczak_browser_login_url(host, strlang.ToStdString(), localhost);
+            BOOST_LOG_TRIVIAL(info) << "external login url = " << browser_url;
+            const wxString browser_url_wx = wxString::FromUTF8(browser_url);
+            const bool browser_opened = pjarczak_open_external_browser(browser_url_wx);
+            BOOST_LOG_TRIVIAL(info) << "external login browser_opened=" << (browser_opened ? 1 : 0);
+            if (!browser_opened)
+                BOOST_LOG_TRIVIAL(error) << "failed to open external browser for login";
+            m_networkOk = true;
+        }
+    }
+#endif
 
     if (this->ShowModal() == wxID_OK) {
         return true;
