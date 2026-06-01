@@ -168,20 +168,6 @@ public:
     FilamentSyncMode get_filament_sync_mode() const;
     bool fetch_filament_info(std::string dev_id);
     int request_bind_ticket(std::string* ticket);
-    int get_subtask_info(std::string subtask_id, std::string* task_json, unsigned int* http_code, std::string* http_body, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int get_slice_info(std::string project_id, std::string profile_id, int plate_index, std::string* slice_json, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int query_bind_status(std::vector<std::string> query_list, unsigned int* http_code, std::string* http_body, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int modify_printer_name(std::string dev_id, std::string dev_name, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int get_camera_url(std::string dev_id, std::function<void(std::string)> callback, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int get_design_staffpick(int offset, int limit, std::function<void(std::string)> callback, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int start_publish(PublishParams params, OnUpdateStatusFn update_fn, WasCancelledFn cancel_fn, std::string* out, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int get_model_publish_url(std::string* url, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int get_subtask(BBLModelTask* task, OnGetSubTaskFn getsub_fn, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int get_model_mall_home_url(std::string* url, const std::string& provider = BBL_CLOUD_PROVIDER);
-    int get_model_mall_detail_url(std::string* url, std::string id, const std::string& provider = BBL_CLOUD_PROVIDER);
-
-    // Get underlying agent handle from BBLNetworkPlugin
-    void* get_network_agent();
 
 private:
     struct PrinterCallbacks {

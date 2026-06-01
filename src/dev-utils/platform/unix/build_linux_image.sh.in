@@ -226,6 +226,7 @@ echo -n "[9/9] Generating Linux app..."
     # so rely on the host WebKitGTK runtime instead of copying the helper stack.
 
     mapfile -d '' BUNDLE_TARGETS < <(find "$BIN_DIR" "$LIB_DIR" "$LIBEXEC_DIR" -type f -print0 2>/dev/null)
+    LD_LIBRARY_PATH="${REPO_ROOT}/deps/build/OrcaSlicer_dep/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
     bundle_dependency_closure "$PRIVATE_LIB_DIR" "${BUNDLE_TARGETS[@]}"
 
 cat << EOF >"$LIBEXEC_DIR/@SLIC3R_APP_CMD@-env"
